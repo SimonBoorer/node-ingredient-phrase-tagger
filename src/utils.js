@@ -116,9 +116,31 @@ export const insideParenthesis = (token, tokens) => {
   }
 };
 
+// HACK: fix this
+const smartJoin = words => {
+  /*
+  Joins list of words with spaces, but is smart about not adding spaces
+  before commas.
+  */
+
+  let input = words.join(" ");
+
+  // replace " , " with ", "
+  input = input.replace(" , ", ", ");
+
+  // replace " ( " with " ("
+  input = input.replace("( ", "(");
+
+  // replace " ) " with ") "
+  input = input.replace(" )", ")");
+
+  return input;
+};
+
 export const import_data = instances => {
-  // reassemble the output into a list of dicts.
-  const output = instances.map(([xseq, yseq]) => {
+  // ---- DATA ----
+  // build a dict grouping tokens by their tag
+  const data = instances.map(([xseq, yseq]) => {
     return xseq.reduce((tokens, [token, ...features], i) => {
       // unclump fractions
       token = unclump(token);
@@ -127,14 +149,24 @@ export const import_data = instances => {
       let tag = yseq[i];
       tag = tag.replace(/^[BI]-/, "").toLowerCase();
 
+      // initialize this attribute if this is the first token of its kind
+      tokens[tag] = tokens[tag] || [];
+
       // HACK: If this token is a unit, singularize it so Scoop accepts it.
       if (tag === "unit") {
         token = inflection.singularize(token);
       }
 
-      tokens[tag] = tokens[tag] || [];
       tokens[tag].push(token);
       return tokens;
+    }, {});
+  });
+
+  // reassemble the output into a list of dicts.
+  const output = data.map(ingredient => {
+    return Object.keys(ingredient).reduce((accumulator, tag) => {
+      accumulator[tag] = smartJoin(ingredient[tag]);
+      return accumulator;
     }, {});
   });
 
