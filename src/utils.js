@@ -116,6 +116,21 @@ export const insideParenthesis = (token, tokens) => {
   }
 };
 
+const displayIngredient = ingredient => {
+  /*
+  Format a list of (tag, [tokens]) tuples as an HTML string for display.
+
+      displayIngredient([("qty", ["1"]), ("name", ["cat", "pie"])])
+      # => <span class='qty'>1</span> <span class='name'>cat pie</span>
+  */
+
+  return ingredient
+    .map(([tag, tokens]) => {
+      return `<span class='${tag}'>${tokens.join(" ")}</span>`;
+    })
+    .join("");
+};
+
 // HACK: fix this
 const smartJoin = words => {
   /*
@@ -138,10 +153,14 @@ const smartJoin = words => {
 };
 
 export const import_data = instances => {
-  // ---- DATA ----
-  // build a dict grouping tokens by their tag
-  const data = instances.map(([xseq, yseq]) => {
-    return xseq.reduce((tokens, [token, ...features], i) => {
+  const data = [];
+  const display = [];
+  for (const [xseq, yseq] of instances) {
+    const ingredientData = {};
+    const ingredientDisplay = [];
+    let prevTag = null;
+
+    xseq.forEach(([token, ...features], i) => {
       // unclump fractions
       token = unclump(token);
 
@@ -149,18 +168,34 @@ export const import_data = instances => {
       let tag = yseq[i];
       tag = tag.replace(/^[BI]-/, "").toLowerCase();
 
+      // ---- DISPLAY ----
+      // build a structure which groups each token by its tag, so we can
+      // rebuild the original display name later.
+
+      if (prevTag !== tag) {
+        ingredientDisplay.push([tag, [token]]);
+        prevTag = tag;
+      } else {
+        ingredientDisplay[ingredientDisplay.length - 1][1].push(token);
+      }
+
+      // ---- DATA ----
+      // build a dict grouping tokens by their tag
+
       // initialize this attribute if this is the first token of its kind
-      tokens[tag] = tokens[tag] || [];
+      ingredientData[tag] = ingredientData[tag] || [];
 
       // HACK: If this token is a unit, singularize it so Scoop accepts it.
       if (tag === "unit") {
         token = inflection.singularize(token);
       }
 
-      tokens[tag].push(token);
-      return tokens;
-    }, {});
-  });
+      ingredientData[tag].push(token);
+    });
+
+    data.push(ingredientData);
+    display.push(ingredientDisplay);
+  }
 
   // reassemble the output into a list of dicts.
   const output = data.map(ingredient => {
@@ -169,6 +204,18 @@ export const import_data = instances => {
       return accumulator;
     }, {});
   });
+
+  // Add the marked-up display data
+  for (const i of output.keys()) {
+    output[i]["display"] = displayIngredient(display[i]);
+  }
+
+  // Add the raw ingredient phrase
+  for (const i of output.keys()) {
+    output[i]["input"] = smartJoin(
+      display[i].map(([tag, tokens]) => tokens.join(" "))
+    );
+  }
 
   return output;
 };
