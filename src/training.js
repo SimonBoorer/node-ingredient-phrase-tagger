@@ -79,15 +79,21 @@ const matchUp = (token, ingredientRow) => {
   const decimalToken = parseNumbers(token);
 
   for (const [key, val] of Object.entries(ingredientRow)) {
-    if (typeof val === "string" || val instanceof String) {
+    if (decimalToken !== null) {
+      const m = val.match(/^\d+[.]\d+$/);
+      if (m && val.endsWith(".0")) {
+        const cleanVal = val.slice(0, -2);
+        if (cleanVal === decimalToken.toString()) {
+          ret.push(key.toUpperCase());
+        }
+      } else if (val === decimalToken.toString()) {
+        ret.push(key.toUpperCase());
+      }
+    } else if (typeof val === "string" || val instanceof String) {
       for (const vt of utils.tokenize(val)) {
         if (utils.normalizeToken(vt) === token) {
           ret.push(key.toUpperCase());
         }
-      }
-    } else if (decimalToken !== null) {
-      if (val === decimalToken) {
-        ret.push(key.toUpperCase());
       }
     }
   }
